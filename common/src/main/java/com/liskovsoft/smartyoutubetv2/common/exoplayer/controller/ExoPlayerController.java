@@ -87,12 +87,6 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
             mYandexVotPlayer.setPlayWhenReady(mPlayer.getPlayWhenReady());
             PlaybackParameters parameters = mPlayer.getPlaybackParameters();
             if (parameters != null) mYandexVotPlayer.setPlaybackParameters(parameters);
-            mYandexVotHandler.removeCallbacks(mYandexVotSync);
-            mYandexVotHandler.post(mYandexVotSync);
-            PlaybackParameters parameters = mPlayer.getPlaybackParameters();
-            if (parameters != null) {
-                mYandexVotPlayer.setPlaybackParameters(parameters);
-            }
             mYandexVotHandler.postDelayed(this, 500);
         }
     };
@@ -210,6 +204,10 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
             mYandexVotPlayer.prepare(mMediaSourceFactory.fromDirectUrl(audioUrl));
             mYandexVotPlayer.seekTo(Math.max(0, mPlayer.getCurrentPosition()));
             mYandexVotPlayer.setPlayWhenReady(mPlayer.getPlayWhenReady());
+            PlaybackParameters parameters = mPlayer.getPlaybackParameters();
+            if (parameters != null) mYandexVotPlayer.setPlaybackParameters(parameters);
+            mYandexVotHandler.removeCallbacks(mYandexVotSync);
+            mYandexVotHandler.post(mYandexVotSync);
             mYandexVotBaseVolume = mPlayer.getVolume();
             mPlayer.setVolume(mYandexVotBaseVolume *
                     YandexVotData.instance(mContext).getOriginalVolume() / 100f);
