@@ -37,6 +37,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.VideoTrack
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.ExoUtils;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.yavot.YandexVotCoordinator;
 
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
@@ -64,6 +65,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     private VolumeBooster mVolumeBooster;
     private boolean mIsEnded;
     private Runnable mOnVideoLoaded;
+    private YandexVotCoordinator mYandexVotCoordinator;
 
     public ExoPlayerController(Context context, PlayerEventListener eventListener) {
         PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
