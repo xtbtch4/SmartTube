@@ -122,14 +122,43 @@ public class YandexVotApiClient {
     private static volatile String lastValidatedToken = null;
     private static volatile boolean tokenIsValid = false;
 
-    private record CachedResult(TranslationResult result, long createdAt) {
+    private static final class CachedResult {
+        private final TranslationResult mResult;
+        private final long mCreatedAt;
+
+        CachedResult(TranslationResult result, long createdAt) {
+            mResult = result;
+            mCreatedAt = createdAt;
+        }
+
+        TranslationResult result() { return mResult; }
+
         boolean isExpired() {
-            return System.currentTimeMillis() - createdAt > CACHE_TTL_MS;
+            return System.currentTimeMillis() - mCreatedAt > CACHE_TTL_MS;
         }
     }
 
-    public record TranslationResult(int status, String audioUrl, int remainingTime,
-                                    String translationId, String message) {
+    public static final class TranslationResult {
+        private final int mStatus;
+        private final String mAudioUrl;
+        private final int mRemainingTime;
+        private final String mTranslationId;
+        private final String mMessage;
+
+        public TranslationResult(int status, String audioUrl, int remainingTime,
+                String translationId, String message) {
+            mStatus = status;
+            mAudioUrl = audioUrl;
+            mRemainingTime = remainingTime;
+            mTranslationId = translationId;
+            mMessage = message;
+        }
+
+        public int status() { return mStatus; }
+        public String audioUrl() { return mAudioUrl; }
+        public int remainingTime() { return mRemainingTime; }
+        public String translationId() { return mTranslationId; }
+        public String message() { return mMessage; }
     }
 
     /**
