@@ -56,6 +56,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegme
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.controller.ExoPlayerController;
+import com.liskovsoft.smartyoutubetv2.common.yavot.YandexVotCoordinator;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.DebugInfoManager;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.ExoPlayerInitializer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SubtitleManager;
@@ -946,6 +947,22 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     // Begin Engine Events
 
     @Override
+    @Override
+    public void setYandexVotAudioSource(MediaItemFormatInfo formatInfo) {
+        if (mExoPlayerController != null) mExoPlayerController.setYandexVotAudioSource(formatInfo);
+    }
+
+    @Override
+    public void startYandexVot(YandexVotCoordinator.Listener listener) {
+        if (mExoPlayerController != null) mExoPlayerController.startYandexVot(listener);
+        else if (listener != null) listener.onError("Player engine is not initialized");
+    }
+
+    @Override
+    public void cancelYandexVot() {
+        if (mExoPlayerController != null) mExoPlayerController.cancelYandexVot();
+    }
+
     public void openSabr(MediaItemFormatInfo formatInfo) {
         mExoPlayerController.openSabr(formatInfo);
     }
