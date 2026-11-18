@@ -429,21 +429,21 @@ public class YandexVotProtobuf {
      * Skip a field of the given wire type. Returns new position.
      */
     private static int skipField(byte[] data, int pos, int wireType) {
-        return switch (wireType) {
-            case WIRETYPE_VARINT -> {
+        switch (wireType) {
+            case WIRETYPE_VARINT:
                 while (pos < data.length && (data[pos] & 0x80) != 0) {
                     pos++;
                 }
-                yield pos + 1;
-            }
-            case WIRETYPE_64BIT -> pos + 8;
-            case WIRETYPE_LENGTH_DELIMITED -> {
+                return pos + 1;
+            case WIRETYPE_64BIT:
+                return pos + 8;
+            case WIRETYPE_LENGTH_DELIMITED:
                 int[] lenResult = readVarint(data, pos);
-                yield lenResult[1] + lenResult[0];
-            }
-            case 5 -> // 32-bit
-                    pos + 4;
-            default -> data.length; // unknown wire type, skip to end
-        };
+                return lenResult[1] + lenResult[0];
+            case 5:
+                return pos + 4;
+            default:
+                return data.length;
+        }
     }
 }
