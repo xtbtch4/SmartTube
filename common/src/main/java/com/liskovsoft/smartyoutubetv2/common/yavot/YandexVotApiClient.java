@@ -146,7 +146,7 @@ public class YandexVotApiClient {
 
     @NonNull
     private static String getProxyBaseUrl() {
-        String configuredUrl = YandexVotSettings.YANDEX_VOT_PROXY_URL.get().trim();
+        String configuredUrl = audioProxyUrl.trim();
         if (!configuredUrl.matches("(?i)^https?://.*")) {
             configuredUrl = "https://" + configuredUrl;
         }
@@ -190,7 +190,7 @@ public class YandexVotApiClient {
             logDebug(() -> "toProxyAudioUrl: proxy URL created");
             return proxyUrl.toString();
         } catch (URISyntaxException e) {
-            Logger.printDebug(() -> "toProxyAudioUrl: invalid URL");
+            logDebug(() -> "toProxyAudioUrl: invalid URL");
             return originalUrl;
         }
     }
@@ -313,14 +313,14 @@ public class YandexVotApiClient {
     ) {
         // Proactively ensure a valid session exists before any API call.
         if (!ensureSession()) {
-            Logger.printDebug(() -> "VOT: unable to establish session, network may be unavailable");
+            logDebug(() -> "VOT: unable to establish session, network may be unavailable");
             return null;
         }
 
         String cacheKey = videoUrl + "|" + sourceLang + "|" + targetLang + "|" + useLiveVoices;
         CachedResult cached = translationCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
-            Logger.printDebug(() -> "VOT cache hit");
+            logDebug(() -> "VOT cache hit");
             return cached.result();
         }
         if (cached != null) {
@@ -334,7 +334,7 @@ public class YandexVotApiClient {
         }
         // Validate OAuth token before using it (makes a lightweight API call, cached per process).
         if (oauthToken != null && !isValidOAuthToken(oauthToken)) {
-            Logger.printDebug(() -> "VOT OAuth token is invalid, clearing and falling back");
+            logDebug(() -> "VOT OAuth token is invalid, clearing and falling back");
             oauthToken = "";
             // Return a special result — caller will show "auth required" toast.
             return new TranslationResult(STATUS_SESSION_REQUIRED, null, 0, null, null);
@@ -367,7 +367,7 @@ public class YandexVotApiClient {
 
                 // If server asks for a session, create one and retry
                 if (response.status == STATUS_SESSION_REQUIRED && attempt == 0) {
-                    Logger.printDebug(() -> "VOT: session required, creating session and retrying...");
+                    logDebug(() -> "VOT: session required, creating session and retrying...");
                     invalidateSession();
                     if (createSession()) {
                         continue;
@@ -393,7 +393,7 @@ public class YandexVotApiClient {
             } catch (Exception e) {
                 // Deliberately log only a stable category: exception messages can contain the
                 // request URL, session material, or a server response body.
-                Logger.printDebug(() -> "VOT request failed: " + requestFailureCategory(e));
+                logDebug(() -> "VOT request failed: " + requestFailureCategory(e));
                 return null;
             }
         }
@@ -473,7 +473,7 @@ public class YandexVotApiClient {
 
         boolean useProxy = isProxyEnabled();
         String requestUrl = getApiUrl(path);
-        Logger.printDebug(() -> "VOT sendApiRequest: method=" + method
+        logDebug(() -> "VOT sendApiRequest: method=" + method
                 + " proxy=" + useProxy);
 
         HttpURLConnection connection = (HttpURLConnection) new URL(requestUrl).openConnection();
@@ -508,7 +508,7 @@ public class YandexVotApiClient {
 
             int responseCode = connection.getResponseCode();
             if (responseCode != 200) {
-                Logger.printDebug(() -> "VOT sendApiRequest: HTTP " + responseCode);
+                logDebug(() -> "VOT sendApiRequest: HTTP " + responseCode);
                 return null;
             }
 
@@ -571,7 +571,7 @@ public class YandexVotApiClient {
 
             boolean useProxy = isProxyEnabled();
             String requestUrl = getApiUrl(path);
-            Logger.printDebug(() -> "VOT createSession: method=POST proxy=" + useProxy);
+            logDebug(() -> "VOT createSession: method=POST proxy=" + useProxy);
 
             HttpURLConnection connection = (HttpURLConnection) new URL(requestUrl).openConnection();
             try {
@@ -604,19 +604,19 @@ public class YandexVotApiClient {
 
                 int responseCode = connection.getResponseCode();
                 if (responseCode != 200) {
-                    Logger.printDebug(() -> "VOT createSession: returned " + responseCode);
+                    logDebug(() -> "VOT createSession: returned " + responseCode);
                     return false;
                 }
 
                 byte[] responseBytes = readBytes(connection.getInputStream());
                 if (responseBytes == null || responseBytes.length == 0) {
-                    Logger.printDebug(() -> "VOT createSession: empty response");
+                    logDebug(() -> "VOT createSession: empty response");
                     return false;
                 }
 
                 YandexVotProtobuf.SessionResponse response = YandexVotProtobuf.decodeSessionResponse(responseBytes);
                 if (response.secretKey == null || response.secretKey.isEmpty()) {
-                    Logger.printDebug(() -> "VOT createSession: no secretKey in response");
+                    logDebug(() -> "VOT createSession: no secretKey in response");
                     return false;
                 }
 
@@ -625,7 +625,7 @@ public class YandexVotApiClient {
                 // expires is in seconds from the session creation time
                 sessionExpiresAt = System.currentTimeMillis() + (response.expires > 0 ? response.expires * 1000L : 3600_000L);
 
-                Logger.printDebug(() -> "VOT createSession: success, expires in " + response.expires + "s");
+                logDebug(() -> "VOT createSession: success, expires in " + response.expires + "s");
                 return true;
 
             } finally {
@@ -635,13 +635,13 @@ public class YandexVotApiClient {
             logException(() -> "VOT createSession failed: DNS resolution error", e);
             return false;
         } catch (SocketTimeoutException e) {
-            Logger.printException(() -> "VOT createSession failed: connection timeout", e);
+            logException(() -> "VOT createSession failed: connection timeout", e);
             return false;
         } catch (ConnectException e) {
-            Logger.printException(() -> "VOT createSession failed: connection refused", e);
+            logException(() -> "VOT createSession failed: connection refused", e);
             return false;
         } catch (Exception e) {
-            Logger.printException(() -> "VOT createSession failed", e);
+            logException(() -> "VOT createSession failed", e);
             return false;
         }
     }
@@ -682,20 +682,20 @@ public class YandexVotApiClient {
                 int code = conn.getResponseCode();
                 lastValidatedToken = token;
                 tokenIsValid = (code == 200);
-                Logger.printDebug(() -> "VOT OAuth token validation: HTTP " + code
+                logDebug(() -> "VOT OAuth token validation: HTTP " + code
                         + " -> " + (tokenIsValid ? "valid" : "invalid"));
                 return tokenIsValid;
             } finally {
                 conn.disconnect();
             }
         } catch (UnknownHostException | SocketTimeoutException | ConnectException e) {
-            Logger.printDebug(() -> "VOT OAuth token validation: network error (" +
+            logDebug(() -> "VOT OAuth token validation: network error (" +
                     e.getClass().getSimpleName() + "), assuming valid temporarily");
             // Network is unreachable — assume valid to avoid blocking the user,
             // but DON'T cache so we re-validate when the network recovers.
             return true;
         } catch (Exception e) {
-            Logger.printDebug(() -> "VOT OAuth token validation failed ("
+            logDebug(() -> "VOT OAuth token validation failed ("
                     + e.getClass().getSimpleName() + ")");
             // Unknown error — cache as invalid to prevent repeated failures.
             lastValidatedToken = token;
@@ -731,7 +731,7 @@ public class YandexVotApiClient {
             String jsonBody = "{\"video_url\":\"" + videoUrl + "\"}";
             sendJsonRequest(path, jsonBody, "PUT");
         } catch (Exception e) {
-            Logger.printException(() -> "YandexVotApiClient.sendFailedAudio failed", e);
+            logException(() -> "YandexVotApiClient.sendFailedAudio failed", e);
         }
     }
 
@@ -746,7 +746,7 @@ public class YandexVotApiClient {
                     translationId, videoUrl, fileId, audioData);
             return sendAudioRequestBody(body);
         } catch (Exception e) {
-            Logger.printException(() -> "YandexVotApiClient.sendAudio failed", e);
+            logException(() -> "YandexVotApiClient.sendAudio failed", e);
             return false;
         }
     }
@@ -772,7 +772,7 @@ public class YandexVotApiClient {
             );
             return sendAudioRequestBody(body);
         } catch (Exception e) {
-            Logger.printException(() -> "YandexVotApiClient.sendPartialAudio failed", e);
+            logException(() -> "YandexVotApiClient.sendPartialAudio failed", e);
             return false;
         }
     }
@@ -799,7 +799,7 @@ public class YandexVotApiClient {
             String path = "/video-translation/audio";
             sendApiRequest(path, body, "PUT", oauthToken);
         } catch (Exception e) {
-            Logger.printException(() -> "YandexVotApiClient.sendEmptyAudio failed", e);
+            logException(() -> "YandexVotApiClient.sendEmptyAudio failed", e);
         }
     }
 
@@ -841,7 +841,7 @@ public class YandexVotApiClient {
             }
             int responseCode = connection.getResponseCode();
             if (responseCode < 200 || responseCode >= 300) {
-                Logger.printDebug(() -> "VOT sendJsonRequest: HTTP " + responseCode);
+                logDebug(() -> "VOT sendJsonRequest: HTTP " + responseCode);
             }
         } finally {
             connection.disconnect();
