@@ -92,7 +92,6 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         mTrackSelectorManager.selectTrack(FormatItem.toMediaTrack(playerData.getFormat(FormatItem.TYPE_SUBTITLE)));
     }
 
-    @Override
     public void setYandexVotAudioSource(MediaItemFormatInfo formatInfo) {
         mYandexVotAudioSource = null;
         if (formatInfo == null || formatInfo.getAdaptiveFormats() == null) {
@@ -102,7 +101,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         MediaFormat selected = null;
         long selectedBitrate = -1;
         for (MediaFormat format : formatInfo.getAdaptiveFormats()) {
-            if (format == null || format.getMimeType() == null
+            if (format == null || format.getFormatType() != MediaFormat.FORMAT_TYPE_DASH || format.getMimeType() == null
                     || !format.getMimeType().toLowerCase(java.util.Locale.US).startsWith("audio/")
                     || format.getUrl() == null || format.getUrl().length() == 0) {
                 continue;
@@ -136,7 +135,6 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         }
     }
 
-    @Override
     public void startYandexVot(YandexVotCoordinator.Listener listener) {
         final Video video = getVideo();
         if (video == null || video.videoId == null || video.videoId.length() == 0) {
@@ -156,7 +154,6 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
                 () -> source, listener);
     }
 
-    @Override
     public void cancelYandexVot() {
         if (mYandexVotCoordinator != null) {
             mYandexVotCoordinator.cancel();
