@@ -3,11 +3,12 @@ package com.liskovsoft.smartyoutubetv2.common.exoplayer.controller;
 import android.content.Context;
 import android.os.Build;
 import android.os.Build.VERSION;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayerFactory;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.liskovsoft.smartyoutubetv2.common.prefs.YandexVotData;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
@@ -74,6 +75,27 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     private YandexVotCoordinator.AudioSource mYandexVotAudioSource;
     private SimpleExoPlayer mYandexVotPlayer;
     private float mYandexVotBaseVolume = 1f;
+    private final Handler mYandexVotHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mYandexVotSync = new Runnable() {
+        @Override public void run() {
+            if (mYandexVotPlayer == null || mPlayer == null) return;
+            long videoPosition = mPlayer.getCurrentPosition();
+            long audioPosition = mYandexVotPlayer.getCurrentPosition();
+            if (Math.abs(videoPosition - audioPosition) > 500) {
+                mYandexVotPlayer.seekTo(videoPosition);
+            }
+            mYandexVotPlayer.setPlayWhenReady(mPlayer.getPlayWhenReady());
+            PlaybackParameters parameters = mPlayer.getPlaybackParameters();
+            if (parameters != null) mYandexVotPlayer.setPlaybackParameters(parameters);
+            mYandexVotHandler.removeCallbacks(mYandexVotSync);
+            mYandexVotHandler.post(mYandexVotSync);
+            PlaybackParameters parameters = mPlayer.getPlaybackParameters();
+            if (parameters != null) {
+                mYandexVotPlayer.setPlaybackParameters(parameters);
+            }
+            mYandexVotHandler.postDelayed(this, 500);
+        }
+    };
 
     public ExoPlayerController(Context context, PlayerEventListener eventListener) {
         PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
@@ -198,6 +220,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     }
 
     private void stopYandexVotAudio() {
+        mYandexVotHandler.removeCallbacks(mYandexVotSync);
         if (mYandexVotPlayer != null) {
             try {
                 mYandexVotPlayer.stop();
