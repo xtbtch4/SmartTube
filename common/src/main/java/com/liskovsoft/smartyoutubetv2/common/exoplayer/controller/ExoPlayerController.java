@@ -5,6 +5,10 @@ import android.os.Build;
 import android.os.Build.VERSION;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
+import com.google.android.exoplayer2.ExoPlayerFactory;
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
+import com.liskovsoft.smartyoutubetv2.common.prefs.YandexVotData;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -68,6 +72,8 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     private Runnable mOnVideoLoaded;
     private YandexVotCoordinator mYandexVotCoordinator;
     private YandexVotCoordinator.AudioSource mYandexVotAudioSource;
+    private SimpleExoPlayer mYandexVotPlayer;
+    private float mYandexVotBaseVolume = 1f;
 
     public ExoPlayerController(Context context, PlayerEventListener eventListener) {
         PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
@@ -151,12 +157,58 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         final YandexVotCoordinator.AudioSource source = mYandexVotAudioSource;
         mYandexVotCoordinator.translate(video.videoId, video.title,
                 video.getDurationMs() > 0 ? video.getDurationMs() / 1000.0 : 0,
-                () -> source, listener);
+                () -> source, new YandexVotCoordinator.Listener() {
+                    @Override public void onWaiting(int remainingSeconds) {
+                        if (listener != null) listener.onWaiting(remainingSeconds);
+                    }
+                    @Override public void onAudioReady(String audioUrl) {
+                        playYandexVotAudio(audioUrl);
+                        if (listener != null) listener.onAudioReady(audioUrl);
+                    }
+                    @Override public void onError(String reason) {
+                        if (listener != null) listener.onError(reason);
+                    }
+                });
     }
 
     public void cancelYandexVot() {
         if (mYandexVotCoordinator != null) {
             mYandexVotCoordinator.cancel();
+        }
+        stopYandexVotAudio();
+    }
+
+    private void playYandexVotAudio(String audioUrl) {
+        if (audioUrl == null || audioUrl.isEmpty() || mPlayer == null) return;
+        stopYandexVotAudio();
+        try {
+            mYandexVotPlayer = ExoPlayerFactory.newSimpleInstance(
+                    mContext, new DefaultRenderersFactory(mContext), new DefaultTrackSelector());
+            mYandexVotPlayer.setVolume(YandexVotData.instance(mContext).getTranslationVolume() / 100f);
+            mYandexVotPlayer.prepare(mMediaSourceFactory.fromDirectUrl(audioUrl));
+            mYandexVotPlayer.seekTo(Math.max(0, mPlayer.getCurrentPosition()));
+            mYandexVotPlayer.setPlayWhenReady(mPlayer.getPlayWhenReady());
+            mYandexVotBaseVolume = mPlayer.getVolume();
+            mPlayer.setVolume(mYandexVotBaseVolume *
+                    YandexVotData.instance(mContext).getOriginalVolume() / 100f);
+        } catch (RuntimeException error) {
+            Log.e(TAG, "Unable to start YaVoT audio", error);
+            stopYandexVotAudio();
+        }
+    }
+
+    private void stopYandexVotAudio() {
+        if (mYandexVotPlayer != null) {
+            try {
+                mYandexVotPlayer.stop();
+                mYandexVotPlayer.release();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Unable to release YaVoT audio", error);
+            }
+            mYandexVotPlayer = null;
+        }
+        if (mPlayer != null) {
+            mPlayer.setVolume(mYandexVotBaseVolume);
         }
     }
 
@@ -281,6 +333,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         // NOTE: Avoid to check live streams duration here as ones may have undefined (-1) duration on loading stage.
         if (mPlayer != null && positionMs >= 0) {
             mPlayer.seekTo(positionMs);
+            if (mYandexVotPlayer != null) mYandexVotPlayer.seekTo(positionMs);
             // When we are dealing with SABR live that doesn't exceed 24 hours in length, we can set the duration right here
             mSabrLiveStartPending = false;
         }
@@ -309,6 +362,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     public void setPlayWhenReady(boolean play) {
         if (mPlayer != null) {
             mPlayer.setPlayWhenReady(play);
+            if (mYandexVotPlayer != null) mYandexVotPlayer.setPlayWhenReady(play);
         }
     }
 
@@ -545,6 +599,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
                 mPlayer.setPlaybackParameters(new PlaybackParameters(speed, mPlayer.getPlaybackParameters().pitch));
             } else {
                 mPlayer.setPlaybackParameters(new PlaybackParameters(speed, speed));
+            if (mYandexVotPlayer != null) mYandexVotPlayer.setPlaybackParameters(new PlaybackParameters(speed, speed));
             }
 
             mTrackFormatter.setSpeed(speed);
@@ -637,6 +692,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     }
 
     private void releasePlayer() {
+        stopYandexVotAudio();
         if (mYandexVotCoordinator != null) {
             mYandexVotCoordinator.release();
             mYandexVotCoordinator = null;
