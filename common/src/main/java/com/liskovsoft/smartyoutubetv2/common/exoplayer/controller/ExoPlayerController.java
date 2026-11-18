@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
@@ -66,6 +67,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     private boolean mIsEnded;
     private Runnable mOnVideoLoaded;
     private YandexVotCoordinator mYandexVotCoordinator;
+    private YandexVotCoordinator.AudioSource mYandexVotAudioSource;
 
     public ExoPlayerController(Context context, PlayerEventListener eventListener) {
         PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
@@ -88,6 +90,77 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
         mTrackSelectorManager.selectTrack(FormatItem.toMediaTrack(playerData.getFormat(FormatItem.TYPE_VIDEO)));
         mTrackSelectorManager.selectTrack(FormatItem.toMediaTrack(playerData.getFormat(FormatItem.TYPE_AUDIO)));
         mTrackSelectorManager.selectTrack(FormatItem.toMediaTrack(playerData.getFormat(FormatItem.TYPE_SUBTITLE)));
+    }
+
+    @Override
+    public void setYandexVotAudioSource(MediaItemFormatInfo formatInfo) {
+        mYandexVotAudioSource = null;
+        if (formatInfo == null || formatInfo.getAdaptiveFormats() == null) {
+            return;
+        }
+
+        MediaFormat selected = null;
+        long selectedBitrate = -1;
+        for (MediaFormat format : formatInfo.getAdaptiveFormats()) {
+            if (format == null || format.getMimeType() == null
+                    || !format.getMimeType().toLowerCase(java.util.Locale.US).startsWith("audio/")
+                    || format.getUrl() == null || format.getUrl().length() == 0) {
+                continue;
+            }
+            long size = parsePositiveLong(format.getClen());
+            if (size <= 0) {
+                continue;
+            }
+            long bitrate = parsePositiveLong(format.getBitrate());
+            if (selected == null || bitrate > selectedBitrate) {
+                selected = format;
+                selectedBitrate = bitrate;
+            }
+        }
+
+        if (selected != null) {
+            int itag = (int) parsePositiveLong(selected.getITag());
+            long size = parsePositiveLong(selected.getClen());
+            mYandexVotAudioSource = new YandexVotCoordinator.AudioSource(
+                    selected.getUrl(), itag, size);
+        }
+    }
+
+    private long parsePositiveLong(String value) {
+        if (value == null) return -1;
+        try {
+            long parsed = Long.parseLong(value);
+            return parsed > 0 ? parsed : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    @Override
+    public void startYandexVot(YandexVotCoordinator.Listener listener) {
+        final Video video = getVideo();
+        if (video == null || video.videoId == null || video.videoId.length() == 0) {
+            if (listener != null) listener.onError("No video is selected");
+            return;
+        }
+        if (mYandexVotAudioSource == null) {
+            if (listener != null) listener.onError("No audio-only DASH format is available");
+            return;
+        }
+        if (mYandexVotCoordinator == null) {
+            mYandexVotCoordinator = new YandexVotCoordinator(mContext);
+        }
+        final YandexVotCoordinator.AudioSource source = mYandexVotAudioSource;
+        mYandexVotCoordinator.translate(video.videoId, video.title,
+                video.getDurationMs() > 0 ? video.getDurationMs() / 1000.0 : 0,
+                () -> source, listener);
+    }
+
+    @Override
+    public void cancelYandexVot() {
+        if (mYandexVotCoordinator != null) {
+            mYandexVotCoordinator.cancel();
+        }
     }
 
     public void openSabr(MediaItemFormatInfo formatInfo) {
@@ -169,6 +242,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     }
 
     private void openMediaSource(MediaSource mediaSource) {
+        cancelYandexVot();
         mSabrLiveManifest = null; // set by the sabr live only
         mSabrLiveSeekBlocked = false;
         mSabrLiveStartPending = false;
@@ -566,6 +640,11 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     }
 
     private void releasePlayer() {
+        if (mYandexVotCoordinator != null) {
+            mYandexVotCoordinator.release();
+            mYandexVotCoordinator = null;
+        }
+        mYandexVotAudioSource = null;
         if (mPlayer == null) {
             return;
         }
