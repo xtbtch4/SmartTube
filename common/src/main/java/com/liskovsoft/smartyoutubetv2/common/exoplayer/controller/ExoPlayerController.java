@@ -622,7 +622,12 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
                 mPlayer.setPlaybackParameters(new PlaybackParameters(speed, mPlayer.getPlaybackParameters().pitch));
             } else {
                 mPlayer.setPlaybackParameters(new PlaybackParameters(speed, speed));
-            if (mYandexVotPlayer != null) mYandexVotPlayer.setPlaybackParameters(new PlaybackParameters(speed, speed));
+}
+
+            if (mYandexVotPlayer != null) {
+                PlaybackParameters parameters = mPlayer.getPlaybackParameters();
+                mYandexVotPlayer.setPlaybackParameters(
+                        new PlaybackParameters(parameters.speed, parameters.pitch));
             }
 
             mTrackFormatter.setSpeed(speed);
@@ -642,6 +647,10 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     public void setPitch(float pitch) {
         if (mPlayer != null && pitch > 0) {
             mPlayer.setPlaybackParameters(new PlaybackParameters(mPlayer.getPlaybackParameters().speed, pitch));
+            if (mYandexVotPlayer != null) {
+                mYandexVotPlayer.setPlaybackParameters(
+                        new PlaybackParameters(mPlayer.getPlaybackParameters().speed, pitch));
+            }
         }
     }
 
