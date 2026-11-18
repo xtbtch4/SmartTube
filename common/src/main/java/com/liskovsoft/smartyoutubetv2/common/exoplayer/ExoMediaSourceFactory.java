@@ -97,6 +97,10 @@ public class ExoMediaSourceFactory {
         return buildMediaSource(Uri.parse(hlsPlaylist), HLS_PLAYLIST_EXTENSION);
     }
 
+    public MediaSource fromDirectUrl(String mediaUrl) {
+        return buildMediaSource(Uri.parse(mediaUrl), null);
+    }
+
     public MediaSource fromUrlList(List<String> urlList) {
         MediaSource[] mediaSources = new MediaSource[urlList.size()];
 
